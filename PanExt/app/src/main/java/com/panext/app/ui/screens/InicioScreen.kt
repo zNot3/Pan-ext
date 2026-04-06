@@ -12,6 +12,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.google.firebase.auth.FirebaseAuth
 import com.panext.app.data.Routes
 import com.panext.app.ui.components.*
 import com.panext.app.ui.theme.*
@@ -33,7 +34,7 @@ fun InicioScreen(navController: NavController) {
 
             // Greeting
             Text(
-                text = "¡Hola, Usuario! 👋",
+                text = "¡Hola, ${FirebaseAuth.getInstance().currentUser?.displayName?.split(" ")?.firstOrNull() ?: "Chef"}! 👋",
                 fontSize = 26.sp,
                 fontWeight = FontWeight.Bold,
                 color = Gray800

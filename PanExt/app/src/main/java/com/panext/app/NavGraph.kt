@@ -1,11 +1,13 @@
 package com.panext.app
 
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.google.firebase.auth.FirebaseAuth
+import java.net.URLDecoder
 import com.panext.app.data.Routes
 import com.panext.app.ui.screens.*
 import com.panext.app.ui.theme.PanExtTheme
@@ -13,6 +15,14 @@ import com.panext.app.ui.theme.PanExtTheme
 @Composable
 fun PanExtApp() {
     PanExtTheme {
+        val auth = FirebaseAuth.getInstance()
+        var isLoggedIn by remember { mutableStateOf(auth.currentUser != null) }
+
+        if (!isLoggedIn) {
+            AuthScreen(onAuthSuccess = { isLoggedIn = true })
+            return@PanExtTheme
+        }
+
         val navController = rememberNavController()
 
         NavHost(
@@ -26,7 +36,10 @@ fun PanExtApp() {
                 NotificacionesScreen(navController)
             }
             composable(Routes.PERFIL) {
-                PerfilScreen(navController)
+                PerfilScreen(navController, onLogout = {
+                    auth.signOut()
+                    isLoggedIn = false
+                })
             }
             composable(Routes.COMPRAS) {
                 ComprasScreen(navController)
@@ -34,7 +47,6 @@ fun PanExtApp() {
             composable(Routes.RECETAS) {
                 RecetasScreen(navController)
             }
-            // ── Categorías de recetas ──
             composable(Routes.RECETAS_VERDES) {
                 RecetasVerdesScreen(navController)
             }
@@ -68,6 +80,15 @@ fun PanExtApp() {
             ) { backStackEntry ->
                 val itemId = backStackEntry.arguments?.getInt("itemId") ?: 1
                 DetalleScreen(navController, itemId)
+            }
+            composable(
+                route = Routes.RECETA_DETALLE,
+                arguments = listOf(navArgument("nombre") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val nombre = URLDecoder.decode(
+                    backStackEntry.arguments?.getString("nombre") ?: "", "UTF-8"
+                )
+                RecetaDetalleScreen(navController, nombre)
             }
         }
     }

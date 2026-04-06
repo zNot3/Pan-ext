@@ -149,14 +149,14 @@ fun RecetasVerdesScreen(navController: NavController) {
                     SectionLabel("🌿 Con ingredientes disponibles")
                     AppData.recetasVerdesDisponibles.forEachIndexed { i, receta ->
                         if (i > 0) ItemDivider()
-                        RecetaListRow(receta)
+                        RecetaListRow(receta, navController)
                     }
                 }
                 PanExtCard(modifier = Modifier.padding(bottom = 12.dp)) {
                     SectionLabel("🔒 Otras recetas")
                     AppData.recetasVerdesOtras.forEachIndexed { i, receta ->
                         if (i > 0) ItemDivider()
-                        RecetaListRow(receta)
+                        RecetaListRow(receta, navController)
                     }
                 }
                 Spacer(Modifier.height(20.dp))
@@ -166,12 +166,12 @@ fun RecetasVerdesScreen(navController: NavController) {
 }
 
 @Composable
-fun RecetaListRow(receta: RecetaItem) {
+fun RecetaListRow(receta: RecetaItem, navController: androidx.navigation.NavController? = null) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { }
+            .clickable { if (receta.disponible) navController?.navigate(Routes.recetaDetalle(receta.nombre)) }
             .padding(vertical = 14.dp)
     ) {
         Box(
@@ -232,7 +232,7 @@ fun IngredientesScreen(navController: NavController) {
                     SectionLabel("🥗 Puedes cocinar ahora")
                     AppData.recetasDisponibles.forEachIndexed { i, receta ->
                         if (i > 0) ItemDivider()
-                        AvailableRecipeRow(receta)
+                        AvailableRecipeRow(receta, navController)
                     }
                 }
                 Spacer(Modifier.height(20.dp))
@@ -242,7 +242,7 @@ fun IngredientesScreen(navController: NavController) {
 }
 
 @Composable
-fun AvailableRecipeRow(receta: RecetaItem) {
+fun AvailableRecipeRow(receta: RecetaItem, navController: androidx.navigation.NavController? = null) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
@@ -295,7 +295,7 @@ fun CategoriaRecetasScreen(
                         SectionLabel("🌿 Con ingredientes disponibles")
                         disponibles.forEachIndexed { i, receta ->
                             if (i > 0) ItemDivider()
-                            RecetaListRow(receta)
+                            RecetaListRow(receta, navController)
                         }
                     }
                 }
@@ -304,7 +304,7 @@ fun CategoriaRecetasScreen(
                         SectionLabel("🔒 Otras recetas")
                         otras.forEachIndexed { i, receta ->
                             if (i > 0) ItemDivider()
-                            RecetaListRow(receta)
+                            RecetaListRow(receta, navController)
                         }
                     }
                 }

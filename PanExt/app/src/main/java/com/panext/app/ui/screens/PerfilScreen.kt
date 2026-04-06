@@ -18,12 +18,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import com.google.firebase.auth.FirebaseAuth
 import com.panext.app.data.Routes
 import com.panext.app.ui.components.PanExtBottomNav
 import com.panext.app.ui.theme.*
 
 @Composable
-fun PerfilScreen(navController: NavController) {
+fun PerfilScreen(navController: NavController, onLogout: () -> Unit = {}) {
     Scaffold(
         containerColor = BgColor,
         bottomBar = { PanExtBottomNav(navController, Routes.PERFIL) }
@@ -55,8 +56,8 @@ fun PerfilScreen(navController: NavController) {
                         Text("👤", fontSize = 36.sp)
                     }
                     Spacer(Modifier.height(12.dp))
-                    Text("Nombre Apellido", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Text("usuario@correo.com", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
+                    Text(FirebaseAuth.getInstance().currentUser?.displayName ?: "Usuario", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(FirebaseAuth.getInstance().currentUser?.email ?: "", fontSize = 13.sp, color = Color.White.copy(alpha = 0.8f))
                     Spacer(Modifier.height(16.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
                         ProfileStat("12", "Ingredientes")
@@ -97,7 +98,7 @@ fun PerfilScreen(navController: NavController) {
                 colors = CardDefaults.cardColors(containerColor = Color.White),
                 elevation = CardDefaults.cardElevation(2.dp)
             ) {
-                SettingsRow(icon = "🚪", label = "Cerrar sesión", textColor = RedAlert, iconBg = Color(0xFFFDECEA))
+                SettingsRow(icon = "🚪", label = "Cerrar sesión", textColor = RedAlert, iconBg = Color(0xFFFDECEA), onClick = { FirebaseAuth.getInstance().signOut(); onLogout() })
             }
 
             Spacer(Modifier.height(20.dp))
@@ -114,8 +115,9 @@ fun ProfileStat(number: String, label: String) {
 }
 
 @Composable
-fun SettingsRow(icon: String, label: String, textColor: Color, iconBg: Color = Gray100) {
+fun SettingsRow(icon: String, label: String, textColor: Color, iconBg: Color = Gray100, onClick: (() -> Unit)? = null) {
     Row(
+        modifier = Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable { onClick() } else Modifier),
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
