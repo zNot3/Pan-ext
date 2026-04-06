@@ -20,7 +20,7 @@ export interface InventarioDoc {
   icon: string;
   expira: string;
   qty: number;
-  alert: "expira" | "poco" | null;
+  alert: "expirado" | "expira-hoy" | "expira-pronto" | "bien" | "poco" | null;
   cal: string;
   prot: string;
   gras: string;

@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useNotif } from "@/context/NotifContext";
 
 const navItems = [
   { label:"Inicio",           href:"/",               icon:"🏠", section:"principal" },
@@ -15,6 +16,7 @@ const navItems = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const { unreadCount, urgentCount } = useNotif();
 
   const principal    = navItems.filter(i => i.section === "principal");
   const herramientas = navItems.filter(i => i.section === "herramientas");
@@ -42,7 +44,13 @@ export default function Sidebar() {
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-2 mb-2">Herramientas</p>
         <ul className="space-y-0.5">
           {herramientas.map(item => (
-            <NavLink key={item.href} item={item} active={pathname.startsWith(item.href)} />
+            <NavLink
+              key={item.href}
+              item={item}
+              active={pathname.startsWith(item.href)}
+              badge={item.href === "/notificaciones" ? unreadCount : 0}
+              badgeUrgent={item.href === "/notificaciones" ? urgentCount > 0 : false}
+            />
           ))}
         </ul>
       </nav>
@@ -67,7 +75,14 @@ export default function Sidebar() {
   );
 }
 
-function NavLink({ item, active }: { item: typeof navItems[0]; active: boolean }) {
+function NavLink({
+  item, active, badge = 0, badgeUrgent = false
+}: {
+  item: typeof navItems[0];
+  active: boolean;
+  badge?: number;
+  badgeUrgent?: boolean;
+}) {
   return (
     <li>
       <Link href={item.href}
@@ -76,6 +91,13 @@ function NavLink({ item, active }: { item: typeof navItems[0]; active: boolean }
         }`}>
         <span className="text-base">{item.icon}</span>
         <span className="flex-1 truncate">{item.label}</span>
+        {badge > 0 && (
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none ${
+            badgeUrgent ? "bg-red text-white animate-pulse" : "bg-orange text-white"
+          }`}>
+            {badge > 99 ? "99+" : badge}
+          </span>
+        )}
       </Link>
     </li>
   );
