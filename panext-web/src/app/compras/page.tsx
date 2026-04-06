@@ -89,7 +89,7 @@ interface ExpiraModalProps {
 
 function formatDateInput(raw: string, prev: string): string {
   // Strip everything that isn't a digit
-  const digits = raw.replace(/\D/g, "").slice(0, 6); // ddmmyy → max 6 digits
+  const digits = raw.replace(/\D/g, "").slice(0, 8); // ddmmyyyy → max 8 digits
   // Insert slashes automatically
   if (digits.length <= 2) return digits;
   if (digits.length <= 4) return `${digits.slice(0,2)}/${digits.slice(2)}`;
@@ -97,13 +97,12 @@ function formatDateInput(raw: string, prev: string): string {
 }
 
 function isValidDate(val: string): boolean {
-  // Expects dd/mm/yy or dd/mm/yyyy
+  // Expects dd/mm/yyyy
   const parts = val.split("/");
   if (parts.length !== 3) return false;
-  const [d, m, yRaw] = parts.map(Number);
-  const y = yRaw < 100 ? 2000 + yRaw : yRaw;
+  const [d, m, y] = parts.map(Number);
   if (isNaN(d) || isNaN(m) || isNaN(y)) return false;
-  if (m < 1 || m > 12 || d < 1) return false;
+  if (m < 1 || m > 12 || d < 1 || y < 1000) return false;
   const date = new Date(y, m - 1, d);
   return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
 }
@@ -119,13 +118,13 @@ function ExpiraModal({ item, onConfirm, onCancel }: ExpiraModalProps) {
 
   const handleConfirm = () => {
     if (expira && !isValidDate(expira)) {
-      setError("Fecha inválida. Usá el formato dd/mm/aa.");
+      setError("Fecha inválida. Usá el formato dd/mm/aaaa.");
       return;
     }
     onConfirm(expira);
   };
 
-  const complete = expira.replace(/\D/g, "").length === 6;
+  const complete = expira.replace(/\D/g, "").length === 8;
   const valid    = complete && isValidDate(expira);
 
   return (
@@ -154,8 +153,8 @@ function ExpiraModal({ item, onConfirm, onCancel }: ExpiraModalProps) {
               value={expira}
               onChange={e => handleChange(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") handleConfirm(); if (e.key === "Escape") onCancel(); }}
-              placeholder="dd/mm/aa"
-              maxLength={8}
+              placeholder="dd/mm/aaaa"
+              maxLength={10}
               className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none pr-8 transition-colors ${
                 error
                   ? "border-red-400 focus:border-red-400"
