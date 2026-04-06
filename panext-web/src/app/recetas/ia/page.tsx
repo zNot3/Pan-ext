@@ -46,22 +46,8 @@ export default function RecetaIAPage() {
     setSending(true);
 
     try {
-      // Build context with user's inventory
-      const inventarioCtx = inventario.length > 0
-        ? `\nIngredientes disponibles en el inventario del usuario:\n${inventario.map(i => `- ${i.name} (cantidad: ${i.qty}, expira: ${i.expira})`).join("\n")}\n`
-        : "";
-
-      // Build conversation history for Claude
-      const historial = messages
-        .filter(m => !m.loading)
-        .map(m => ({
-          role: m.isUser ? "user" as const : "assistant" as const,
-          content: m.text,
-        }));
-
       const systemPrompt = `Sos un asistente de cocina amigable y creativo para la app Pan-Ext, una app de gestión de despensa.
 Tu objetivo es ayudar a los usuarios a crear recetas personalizadas basadas en sus ingredientes disponibles.
-${inventarioCtx}
 Reglas:
 - Respondé siempre en español
 - Sé conciso pero completo (máximo 200 palabras por respuesta)
@@ -71,9 +57,28 @@ Reglas:
 - No inventes ingredientes que no existen
 - Si el usuario saluda o hace preguntas generales, respondé naturalmente antes de ofrecer ayuda con recetas`;
 
-      // Gemini requires conversation to start with a "user" turn — drop any
-      // leading assistant messages (e.g. the initial greeting) from history
-      const historialGemini = historial.filter((_, i) =>
+      // Build visible conversation history
+      const historial = messages
+        .filter(m => !m.loading)
+        .map(m => ({
+          role: m.isUser ? "user" as const : "assistant" as const,
+          content: m.text,
+        }));
+
+      // Hidden first turn: send the full inventory silently so Gemini
+      // knows what's available before the user types anything.
+      // This is never shown in the UI.
+      const inventarioPrompt = inventario.length > 0
+        ? `[Contexto del sistema — no mencionar al usuario directamente]\nInventario actual del usuario:\n${inventario.map(i => `- ${i.name} (cantidad: ${i.qty}, expira: ${i.expira})`).join("\n")}\nUsá esta información para sugerir recetas con ingredientes disponibles.`
+        : "[Contexto del sistema] El usuario no tiene productos en su inventario todavía.";
+
+      const hiddenTurns = [
+        { role: "user"      as const, content: inventarioPrompt },
+        { role: "assistant" as const, content: "Entendido, ya tengo el inventario cargado. Estoy listo para ayudarte con recetas." },
+      ];
+
+      // Drop leading assistant message from visible history (the UI greeting)
+      const historialVisible = historial.filter((_, i) =>
         !(i === 0 && historial[0]?.role === "assistant")
       );
 
@@ -84,7 +89,8 @@ Reglas:
         body: JSON.stringify({
           systemPrompt,
           messages: [
-            ...historialGemini,
+            ...hiddenTurns,
+            ...historialVisible,
             { role: "user" as const, content: msg },
           ],
         }),
