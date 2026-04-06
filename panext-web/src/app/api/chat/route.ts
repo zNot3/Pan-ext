@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
+// gemini-2.0-flash-lite: recommended model for new users
 const GEMINI_API_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent";
+
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,8 +18,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Gemini uses "contents" with "parts" and roles "user" / "model"
-    // System instruction goes separately in "system_instruction"
     const contents = messages.map(
       (m: { role: "user" | "assistant"; content: string }) => ({
         role: m.role === "assistant" ? "model" : "user",
@@ -25,32 +26,43 @@ export async function POST(req: NextRequest) {
     );
 
     const body = {
-      system_instruction: {
-        parts: [{ text: systemPrompt }],
-      },
+      system_instruction: { parts: [{ text: systemPrompt }] },
       contents,
-      generationConfig: {
-        maxOutputTokens: 1000,
-        temperature: 0.7,
-      },
+      generationConfig: { maxOutputTokens: 1000, temperature: 0.7 },
     };
 
-    const geminiRes = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    // Retry up to 3 times on 429 with exponential backoff
+    let geminiRes: Response | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      geminiRes = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
 
-    if (!geminiRes.ok) {
-      const errData = await geminiRes.json();
+      if (geminiRes.status !== 429) break;
+
+      const wait = 2000 * Math.pow(2, attempt);
+      console.warn(`Gemini 429 — reintentando en ${wait}ms (intento ${attempt + 1}/3)`);
+      await sleep(wait);
+    }
+
+    if (!geminiRes!.ok) {
+      const errData = await geminiRes!.json();
       console.error("Gemini API error:", errData);
+      const isQuota = geminiRes!.status === 429;
       return NextResponse.json(
-        { error: "Error al comunicarse con Gemini.", detail: errData },
-        { status: geminiRes.status }
+        {
+          error: isQuota
+            ? "Límite de requests de Gemini alcanzado. Esperá unos segundos e intentá de nuevo."
+            : "Error al comunicarse con Gemini.",
+          detail: errData,
+        },
+        { status: geminiRes!.status }
       );
     }
 
-    const data = await geminiRes.json();
+    const data = await geminiRes!.json();
     const reply =
       data.candidates?.[0]?.content?.parts?.[0]?.text ??
       "Lo siento, no pude generar una respuesta. Intentá de nuevo.";
