@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   getCompras, addCompraItem, updateCompraItem, deleteCompraItem, CompraDoc,
@@ -11,7 +11,76 @@ const SUGERENCIAS_INICIALES = [
   "Cebolla morada", "Albahaca fresca",
 ];
 
-// Modal: pedir fecha de expiración al marcar como comprado
+const UNIDADES = ["und", "g", "kg", "ml", "L", "taza", "tbsp", "tsp", "paq", "caja"];
+
+// ── Qty badge editable inline ─────────────────────────────────────────────────
+function QtyBadge({ item, onSave }: { item: CompraDoc; onSave: (qty: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal]         = useState("");
+  const [unit, setUnit]       = useState("und");
+  const ref = useRef<HTMLInputElement>(null);
+
+  const open = () => {
+    if (item.checked) return;
+    // Parse existing qty like "400 ml" or "x1"
+    const match = item.qty.match(/^x?(\d+(?:\.\d+)?)\s*(.*)$/);
+    setVal(match ? match[1] : "1");
+    setUnit(match && match[2] && UNIDADES.includes(match[2]) ? match[2] : "und");
+    setEditing(true);
+    setTimeout(() => ref.current?.select(), 0);
+  };
+
+  const save = () => {
+    const n = parseFloat(val);
+    if (!isNaN(n) && n > 0) {
+      onSave(unit === "und" ? `x${n % 1 === 0 ? n : n}` : `${n} ${unit}`);
+    }
+    setEditing(false);
+  };
+
+  if (!editing) {
+    return (
+      <button
+        onClick={open}
+        title={item.checked ? "" : "Editar cantidad"}
+        className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 transition-colors ${
+          item.checked
+            ? "text-gray-300 cursor-default"
+            : "text-gray-500 bg-gray-100 hover:bg-green-soft hover:text-green-dark cursor-pointer"
+        }`}>
+        {item.qty}
+        {!item.checked && <span className="ml-1 opacity-40">✏</span>}
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
+      <input
+        ref={ref}
+        type="number"
+        min="0.1"
+        step="any"
+        value={val}
+        onChange={e => setVal(e.target.value)}
+        onKeyDown={e => { if (e.key === "Enter") save(); if (e.key === "Escape") setEditing(false); }}
+        className="w-16 text-xs border border-green-mid rounded-lg px-2 py-1 focus:outline-none text-center"
+      />
+      <select
+        value={unit}
+        onChange={e => setUnit(e.target.value)}
+        className="text-xs border border-gray-200 rounded-lg px-1 py-1 focus:outline-none bg-white">
+        {UNIDADES.map(u => <option key={u} value={u}>{u}</option>)}
+      </select>
+      <button onClick={save}
+        className="text-xs bg-green-dark text-white px-2 py-1 rounded-lg hover:bg-green-mid transition-colors">
+        ✓
+      </button>
+    </div>
+  );
+}
+
+// ── Modal: pedir fecha de expiración al marcar como comprado ──────────────────
 interface ExpiraModalProps {
   item: CompraDoc;
   onConfirm: (expira: string) => void;
@@ -28,7 +97,7 @@ function ExpiraModal({ item, onConfirm, onCancel }: ExpiraModalProps) {
           <div className="w-10 h-10 bg-green-soft rounded-xl flex items-center justify-center text-xl">✓</div>
           <div>
             <h3 className="font-semibold text-gray-800">¡Producto comprado!</h3>
-            <p className="text-xs text-gray-400">{item.name}</p>
+            <p className="text-xs text-gray-400">{item.name} · {item.qty}</p>
           </div>
         </div>
         <p className="text-sm text-gray-600 mb-4">
@@ -63,15 +132,78 @@ function ExpiraModal({ item, onConfirm, onCancel }: ExpiraModalProps) {
   );
 }
 
+// ── Modal: nuevo elemento ─────────────────────────────────────────────────────
+interface NuevoModalProps {
+  onConfirm: (name: string, qty: string) => void;
+  onCancel: () => void;
+  saving: boolean;
+}
+
+function NuevoModal({ onConfirm, onCancel, saving }: NuevoModalProps) {
+  const [name, setName] = useState("");
+  const [val, setVal]   = useState("1");
+  const [unit, setUnit] = useState("und");
+
+  const buildQty = () =>
+    unit === "und" ? `x${parseFloat(val) || 1}` : `${parseFloat(val) || 1} ${unit}`;
+
+  const submit = () => {
+    if (!name.trim()) return;
+    onConfirm(name.trim(), buildQty());
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+      onClick={onCancel}>
+      <div className="bg-white rounded-[16px] p-6 w-80 shadow-lg" onClick={e => e.stopPropagation()}>
+        <h3 className="font-semibold text-gray-800 mb-4">Nuevo elemento</h3>
+
+        <label className="text-xs text-gray-500 font-medium block mb-1">Producto</label>
+        <input autoFocus type="text" value={name}
+          onChange={e => setName(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && submit()}
+          placeholder="Ej: Leche, Arroz, Manzana…"
+          className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-mid mb-4" />
+
+        <label className="text-xs text-gray-500 font-medium block mb-1">Cantidad</label>
+        <div className="flex gap-2 mb-5">
+          <input
+            type="number"
+            min="0.1"
+            step="any"
+            value={val}
+            onChange={e => setVal(e.target.value)}
+            className="w-24 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-mid text-center"
+          />
+          <select
+            value={unit}
+            onChange={e => setUnit(e.target.value)}
+            className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-green-mid bg-white">
+            {UNIDADES.map(u => <option key={u} value={u}>{u}</option>)}
+          </select>
+        </div>
+
+        <div className="flex gap-2 justify-end">
+          <button onClick={onCancel}
+            className="text-sm text-gray-500 px-4 py-2 hover:bg-gray-100 rounded-lg">Cancelar</button>
+          <button onClick={submit} disabled={saving || !name.trim()}
+            className="text-sm bg-green-dark text-white font-semibold px-4 py-2 rounded-lg hover:bg-green-mid transition-colors disabled:opacity-60">
+            {saving ? "Guardando…" : "Agregar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Page ──────────────────────────────────────────────────────────────────────
 export default function ComprasPage() {
   const { user } = useAuth();
   const [items, setItems]           = useState<CompraDoc[]>([]);
   const [sugs, setSugs]             = useState<string[]>(SUGERENCIAS_INICIALES);
   const [loading, setLoading]       = useState(true);
   const [showModal, setShowModal]   = useState(false);
-  const [newName, setNewName]       = useState("");
   const [saving, setSaving]         = useState(false);
-  // Modal de expiración al marcar comprado
   const [pendingCheck, setPendingCheck] = useState<CompraDoc | null>(null);
 
   useEffect(() => {
@@ -83,15 +215,9 @@ export default function ComprasPage() {
   const pending   = items.filter(i => !i.checked).length;
   const progress  = items.length > 0 ? Math.round((completed / items.length) * 100) : 0;
 
-  // Clicking the checkbox: if unchecking, just uncheck. If checking → show modal
   const handleCheck = (item: CompraDoc) => {
-    if (item.checked) {
-      // Uncheck directly
-      uncheck(item);
-    } else {
-      // Show expiry modal before marking as bought
-      setPendingCheck(item);
-    }
+    if (item.checked) uncheck(item);
+    else setPendingCheck(item);
   };
 
   const uncheck = async (item: CompraDoc) => {
@@ -102,22 +228,25 @@ export default function ComprasPage() {
 
   const confirmBought = async (expira: string) => {
     if (!user || !pendingCheck || !pendingCheck.id) return;
-
-    // 1. Mark as checked in compras
     setItems(prev => prev.map(i => i.id === pendingCheck.id ? { ...i, checked: true } : i));
     await updateCompraItem(user.uid, pendingCheck.id, { checked: true });
-
-    // 2. Add to inventario
+    const qtyMatch = pendingCheck.qty.match(/[\d.]+/);
+    const qtyNum   = qtyMatch ? parseFloat(qtyMatch[0]) : 1;
     await addInventarioItem(user.uid, {
       name:   pendingCheck.name,
       icon:   "🛒",
       expira: expira.trim() || "—",
-      qty:    1,
+      qty:    isNaN(qtyNum) || qtyNum <= 0 ? 1 : qtyNum,
       alert:  null,
       cal:"—", prot:"—", gras:"—", carb:"—",
     });
-
     setPendingCheck(null);
+  };
+
+  const updateQty = async (item: CompraDoc, qty: string) => {
+    if (!user || !item.id) return;
+    setItems(prev => prev.map(i => i.id === item.id ? { ...i, qty } : i));
+    await updateCompraItem(user.uid, item.id, { qty });
   };
 
   const remove = async (item: CompraDoc) => {
@@ -136,15 +265,15 @@ export default function ComprasPage() {
     setSugs(prev => prev.filter(s => s !== sug));
   };
 
-  const addItem = async () => {
-    if (!user || !newName.trim()) return;
+  const addItem = async (name: string, qty: string) => {
+    if (!user) return;
     setSaving(true);
     const newItem: Omit<CompraDoc, "id"> = {
-      name: newName.trim(), qty: "x1", category: "General", checked: false
+      name, qty, category: "General", checked: false
     };
     const ref = await addCompraItem(user.uid, newItem);
     setItems(prev => [...prev, { ...newItem, id: ref.id }]);
-    setNewName(""); setShowModal(false); setSaving(false);
+    setShowModal(false); setSaving(false);
   };
 
   if (loading) return <LoadingState />;
@@ -203,7 +332,9 @@ export default function ComprasPage() {
                       </div>
                     </div>
 
-                    <span className="text-xs text-gray-400 flex-shrink-0">{item.qty}</span>
+                    {/* Qty badge — editable */}
+                    <QtyBadge item={item} onSave={qty => updateQty(item, qty)} />
+
                     <button onClick={() => remove(item)}
                       className="text-gray-300 hover:text-red transition-colors text-sm flex-shrink-0 px-1">
                       ✕
@@ -245,11 +376,10 @@ export default function ComprasPage() {
             <p className="text-xs text-gray-400 mt-2">{completed} de {items.length} ítems completados</p>
           </div>
 
-          {/* Info tip */}
           <div className="bg-green-soft rounded-[16px] p-4">
             <p className="text-xs text-green-dark font-semibold mb-1">💡 ¿Sabías que?</p>
             <p className="text-xs text-green-dark/80">
-              Al marcar un producto como comprado, te pediremos la fecha de expiración y lo agregaremos automáticamente a tu inventario.
+              Tocá la cantidad de un ítem (ej: <strong>x1</strong>) para cambiarla — podés usar ml, g, kg, L y más.
             </p>
           </div>
         </div>
@@ -257,25 +387,11 @@ export default function ComprasPage() {
 
       {/* Modal: nuevo elemento */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
-          onClick={() => setShowModal(false)}>
-          <div className="bg-white rounded-[16px] p-6 w-80 shadow-lg" onClick={e => e.stopPropagation()}>
-            <h3 className="font-semibold text-gray-800 mb-4">Nuevo elemento</h3>
-            <input autoFocus type="text" value={newName}
-              onChange={e => setNewName(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && addItem()}
-              placeholder="Nombre del producto"
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-mid mb-4" />
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setShowModal(false)}
-                className="text-sm text-gray-500 px-4 py-2 hover:bg-gray-100 rounded-lg">Cancelar</button>
-              <button onClick={addItem} disabled={saving}
-                className="text-sm bg-green-dark text-white font-semibold px-4 py-2 rounded-lg hover:bg-green-mid transition-colors disabled:opacity-60">
-                {saving ? "Guardando…" : "Agregar"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <NuevoModal
+          onConfirm={addItem}
+          onCancel={() => setShowModal(false)}
+          saving={saving}
+        />
       )}
 
       {/* Modal: fecha de expiración al comprar */}
