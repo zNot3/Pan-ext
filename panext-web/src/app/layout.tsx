@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
+import { NotifProvider } from "@/context/NotifContext";
 import ProtectedLayout from "@/components/layout/ProtectedLayout";
 
 export const metadata: Metadata = {
@@ -13,9 +14,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es">
       <body className="bg-bg">
         <AuthProvider>
-          <ProtectedLayout>
-            {children}
-          </ProtectedLayout>
+          <NotifProvider>
+            <ProtectedLayout>
+              {children}
+            </ProtectedLayout>
+          </NotifProvider>
         </AuthProvider>
       </body>
     </html>

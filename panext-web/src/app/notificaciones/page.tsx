@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { getNotificaciones, marcarNotificacionLeida, marcarTodasLeidas, NotificacionDoc, getInventario } from "@/lib/firestore";
 import { syncNotificaciones } from "@/lib/notifications";
+import { useNotif } from "@/context/NotifContext";
 
 type NotifTipo = "urgente" | "aviso" | "info" | "ia" | "sistema";
 
@@ -20,6 +21,7 @@ const dotColor: Record<NotifTipo, string> = {
 
 export default function NotificacionesPage() {
   const { user } = useAuth();
+  const { refresh: refreshBadge } = useNotif();
   const [notifs, setNotifs]   = useState<NotificacionDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -47,12 +49,14 @@ export default function NotificacionesPage() {
     if (!user) return;
     setNotifs(prev => prev.map(n => ({ ...n, leida: true })));
     await marcarTodasLeidas(user.uid);
+    refreshBadge();
   };
 
   const markOne = async (notif: NotificacionDoc) => {
     if (!user || !notif.id || notif.leida) return;
     setNotifs(prev => prev.map(n => n.id === notif.id ? { ...n, leida: true } : n));
     await marcarNotificacionLeida(user.uid, notif.id);
+    refreshBadge();
   };
 
   const urgentes    = notifs.filter(n => n.tipo === "urgente");
