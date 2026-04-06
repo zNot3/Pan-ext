@@ -59,13 +59,7 @@ export default function RecetaIAPage() {
           content: m.text,
         }));
 
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          system: `Sos un asistente de cocina amigable y creativo para la app Pan-Ext, una app de gestión de despensa.
+      const systemPrompt = `Sos un asistente de cocina amigable y creativo para la app Pan-Ext, una app de gestión de despensa.
 Tu objetivo es ayudar a los usuarios a crear recetas personalizadas basadas en sus ingredientes disponibles.
 ${inventarioCtx}
 Reglas:
@@ -75,7 +69,14 @@ Reglas:
 - Si faltan ingredientes del inventario, mencionalo brevemente
 - Sé entusiasta y motivador
 - No inventes ingredientes que no existen
-- Si el usuario saluda o hace preguntas generales, respondé naturalmente antes de ofrecer ayuda con recetas`,
+- Si el usuario saluda o hace preguntas generales, respondé naturalmente antes de ofrecer ayuda con recetas`;
+
+      // Llama al route interno de Next.js — la API key de Gemini queda segura en el servidor
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          systemPrompt,
           messages: [
             ...historial,
             { role: "user" as const, content: msg },
@@ -84,7 +85,9 @@ Reglas:
       });
 
       const data = await response.json();
-      const reply = data.content?.[0]?.text ?? "Lo siento, no pude generar una respuesta. Intentá de nuevo.";
+      const reply = response.ok
+        ? (data.reply ?? "Lo siento, no pude generar una respuesta. Intentá de nuevo.")
+        : "Hubo un error al conectar con la IA. Verificá tu conexión e intentá de nuevo.";
 
       setMessages(prev => prev.map(m =>
         m.loading ? { ...m, text: reply, loading: false } : m
@@ -103,7 +106,7 @@ Reglas:
       {/* Header */}
       <div className="mb-6 flex-shrink-0">
         <h1 className="font-display text-3xl font-bold text-gray-800">Receta con IA ✨</h1>
-        <p className="text-gray-400 mt-1">Powered by Claude — tu chef virtual personalizado</p>
+        <p className="text-gray-400 mt-1">Powered by Gemini — tu chef virtual personalizado</p>
       </div>
 
       <div className="flex gap-6 flex-1 min-h-0">
