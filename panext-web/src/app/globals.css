@@ -18,12 +18,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: #F0EDEA; }
 ::-webkit-scrollbar-thumb { background: #C8C3BC; border-radius: 3px; }
 
+/* Transitions */
 a, button { transition: all 0.15s ease; }
 
+/* Progress bar */
 .progress-bar {
   transition: width 0.4s ease;
 }
