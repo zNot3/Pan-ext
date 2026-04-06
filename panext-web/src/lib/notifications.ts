@@ -1,6 +1,6 @@
 import {
   collection, getDocs, addDoc, deleteDoc,
-  query, where, serverTimestamp
+  serverTimestamp
 } from "firebase/firestore";
 import { db } from "./firebase";
 import { InventarioDoc } from "./firestore";
@@ -40,8 +40,9 @@ function effectiveStatus(item: InventarioDoc): InventarioDoc["alert"] {
 export async function syncNotificaciones(uid: string, inventario: InventarioDoc[]) {
   const notifCol = collection(db, "users", uid, "notificaciones");
 
-  // Delete previous auto-generated notifications
-  const oldSnap = await getDocs(query(notifCol, where("auto", "==", true)));
+  // Delete ALL existing notifications before regenerating
+  // (includes legacy ones that may not have the "auto" field)
+  const oldSnap = await getDocs(notifCol);
   await Promise.all(oldSnap.docs.map(d => deleteDoc(d.ref)));
 
   const nuevas: {
