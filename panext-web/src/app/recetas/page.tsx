@@ -64,7 +64,8 @@ export default function RecetasPage() {
 
 function RecetaCard({ receta }: { receta: RecetaItem }) {
   return (
-    <div className="bg-white rounded-[16px] shadow-[0_2px_12px_rgba(0,0,0,0.07)] p-5 hover:shadow-[0_4px_24px_rgba(0,0,0,0.10)] transition-shadow cursor-pointer">
+    <Link href={`/recetas/${receta.id}`}
+      className="bg-white rounded-[16px] shadow-[0_2px_12px_rgba(0,0,0,0.07)] p-5 hover:shadow-[0_4px_24px_rgba(0,0,0,0.10)] transition-all hover:-translate-y-0.5 cursor-pointer block">
       <div className="flex items-start gap-3">
         <div className="w-14 h-14 bg-[#F0EDEA] rounded-xl flex items-center justify-center text-3xl flex-shrink-0">{receta.icon}</div>
         <div className="flex-1 min-w-0">
@@ -77,7 +78,8 @@ function RecetaCard({ receta }: { receta: RecetaItem }) {
             }
           </div>
         </div>
+        <span className="text-gray-300 text-lg flex-shrink-0">›</span>
       </div>
-    </div>
+    </Link>
   );
 }
