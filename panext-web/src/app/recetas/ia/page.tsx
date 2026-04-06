@@ -71,6 +71,12 @@ Reglas:
 - No inventes ingredientes que no existen
 - Si el usuario saluda o hace preguntas generales, respondé naturalmente antes de ofrecer ayuda con recetas`;
 
+      // Gemini requires conversation to start with a "user" turn — drop any
+      // leading assistant messages (e.g. the initial greeting) from history
+      const historialGemini = historial.filter((_, i) =>
+        !(i === 0 && historial[0]?.role === "assistant")
+      );
+
       // Llama al route interno de Next.js — la API key de Gemini queda segura en el servidor
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -78,23 +84,30 @@ Reglas:
         body: JSON.stringify({
           systemPrompt,
           messages: [
-            ...historial,
+            ...historialGemini,
             { role: "user" as const, content: msg },
           ],
         }),
       });
 
       const data = await response.json();
-      const reply = response.ok
-        ? (data.reply ?? "Lo siento, no pude generar una respuesta. Intentá de nuevo.")
-        : "Hubo un error al conectar con la IA. Verificá tu conexión e intentá de nuevo.";
+      let reply: string;
+      if (response.ok) {
+        reply = data.reply ?? "Lo siento, no pude generar una respuesta. Intentá de nuevo.";
+      } else {
+        // Show the real error in dev so it's easy to diagnose
+        const detail = data.detail?.error?.message ?? data.error ?? `Error ${response.status}`;
+        reply = `Error de la IA: ${detail}`;
+        console.error("Gemini error:", data);
+      }
 
       setMessages(prev => prev.map(m =>
         m.loading ? { ...m, text: reply, loading: false } : m
       ));
-    } catch {
+    } catch (err) {
+      console.error("fetch /api/chat failed:", err);
       setMessages(prev => prev.map(m =>
-        m.loading ? { ...m, text: "Hubo un error al conectar con la IA. Verificá tu conexión e intentá de nuevo.", loading: false } : m
+        m.loading ? { ...m, text: "No se pudo conectar con el servidor. Verificá que la app esté corriendo correctamente.", loading: false } : m
       ));
     } finally {
       setSending(false);
