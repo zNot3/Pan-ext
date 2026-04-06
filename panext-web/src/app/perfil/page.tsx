@@ -1,45 +1,72 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { getPerfil, updatePerfil, PerfilDoc } from "@/lib/firestore";
 
 export default function PerfilPage() {
-  const [prefs, setPrefs] = useState({
-    notifExpiracion: true,
-    sugerenciasIA:   true,
-    modoOscuro:      false,
-    resumenSemanal:  false,
-  });
-  const toggle = (key: keyof typeof prefs) =>
-    setPrefs(p => ({ ...p, [key]: !p[key] }));
+  const { user, logout } = useAuth();
+  const [perfil, setPerfil]   = useState<PerfilDoc | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving]   = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    getPerfil(user.uid).then(data => {
+      setPerfil(data ?? {
+        nombre: user.displayName ?? "Usuario",
+        email:  user.email ?? "",
+        notifExpiracion: true,
+        sugerenciasIA:   true,
+        modoOscuro:      false,
+        resumenSemanal:  false,
+      });
+      setLoading(false);
+    });
+  }, [user]);
+
+  const togglePref = async (key: keyof Omit<PerfilDoc, "nombre" | "email">) => {
+    if (!user || !perfil) return;
+    const updated = { ...perfil, [key]: !perfil[key] };
+    setPerfil(updated);
+    setSaving(true);
+    await updatePerfil(user.uid, { [key]: updated[key] });
+    setSaving(false);
+  };
+
+  if (loading) return <LoadingState />;
+  if (!perfil)  return null;
+
+  const prefs = [
+    { key:"notifExpiracion" as const, icon:"🔔", label:"Notificaciones de expiración", desc:"Recibe alertas cuando tus productos estén por vencer" },
+    { key:"sugerenciasIA"   as const, icon:"✨", label:"Sugerencias de IA",            desc:"Recibe sugerencias automáticas basadas en tu inventario" },
+    { key:"modoOscuro"      as const, icon:"🌙", label:"Modo oscuro",                  desc:"Cambia la apariencia de la aplicación" },
+    { key:"resumenSemanal"  as const, icon:"📧", label:"Resumen semanal por correo",   desc:"Recibe un resumen de tu despensa cada semana" },
+  ];
 
   return (
     <div className="p-8">
       <div className="mb-6">
         <h1 className="font-display text-3xl font-bold text-gray-800">Mi Cuenta</h1>
-        <p className="text-gray-400 mt-1">Configuración y preferencias</p>
+        <p className="text-gray-400 mt-1">Configuración y preferencias {saving && <span className="text-xs text-green-dark ml-2">Guardando…</span>}</p>
       </div>
 
       <div className="grid grid-cols-3 gap-6">
         {/* Profile card */}
         <div className="col-span-1">
-          <div className="bg-white rounded-xl2 shadow-card overflow-hidden">
+          <div className="bg-white rounded-[16px] shadow-[0_2px_12px_rgba(0,0,0,0.07)] overflow-hidden">
             <div className="bg-gradient-to-br from-green-dark to-green-mid p-8 text-center">
-              <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center text-4xl mx-auto mb-3">👤</div>
-              <h2 className="font-display font-bold text-white text-xl">Nombre Apellido</h2>
-              <p className="text-green-soft text-sm mt-1">usuario@correo.com</p>
-              <div className="grid grid-cols-3 gap-4 mt-4">
-                {[{v:"12",l:"Inventario"},{v:"34",l:"Recetas"},{v:"7",l:"Sem. activo"}].map(s=>(
-                  <div key={s.l} className="text-center">
-                    <p className="text-white font-bold text-lg">{s.v}</p>
-                    <p className="text-green-soft text-[10px]">{s.l}</p>
-                  </div>
-                ))}
+              <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center text-4xl mx-auto mb-3">
+                {perfil.nombre?.[0]?.toUpperCase() ?? "👤"}
               </div>
+              <h2 className="font-display font-bold text-white text-xl">{perfil.nombre}</h2>
+              <p className="text-green-soft text-sm mt-1">{perfil.email}</p>
             </div>
             <div className="p-4 space-y-2">
               <button className="w-full border border-gray-200 text-gray-700 text-sm font-medium py-2.5 rounded-xl hover:bg-gray-100 transition-colors">
                 ✏️ Editar perfil
               </button>
-              <button className="w-full bg-red/10 text-red text-sm font-medium py-2.5 rounded-xl hover:bg-red/20 transition-colors">
+              <button onClick={logout}
+                className="w-full bg-red/10 text-red text-sm font-medium py-2.5 rounded-xl hover:bg-red/20 transition-colors">
                 🚪 Cerrar sesión
               </button>
             </div>
@@ -49,15 +76,10 @@ export default function PerfilPage() {
         {/* Settings */}
         <div className="col-span-2 space-y-4">
           {/* Preferencias */}
-          <div className="bg-white rounded-xl2 shadow-card p-6">
+          <div className="bg-white rounded-[16px] shadow-[0_2px_12px_rgba(0,0,0,0.07)] p-6">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">⚙️ Preferencias</p>
             <div className="divide-y divide-gray-100">
-              {[
-                { key:"notifExpiracion" as const, icon:"🔔", label:"Notificaciones de expiración", desc:"Recibe alertas cuando tus productos estén por vencer" },
-                { key:"sugerenciasIA"   as const, icon:"✨", label:"Sugerencias de IA",            desc:"Recibe sugerencias automáticas basadas en tu inventario" },
-                { key:"modoOscuro"      as const, icon:"🌙", label:"Modo oscuro",                   desc:"Cambia la apariencia de la aplicación" },
-                { key:"resumenSemanal"  as const, icon:"📧", label:"Resumen semanal por correo",   desc:"Recibe un resumen de tu despensa cada semana" },
-              ].map(item => (
+              {prefs.map(item => (
                 <div key={item.key} className="flex items-center justify-between py-4">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 bg-gray-100 rounded-xl flex items-center justify-center text-lg">{item.icon}</div>
@@ -67,7 +89,7 @@ export default function PerfilPage() {
                     </div>
                   </div>
                   <button
-                    onClick={() => toggle(item.key)}
+                    onClick={() => togglePref(item.key)}
                     style={{
                       position: "relative",
                       width: "48px",
@@ -76,7 +98,7 @@ export default function PerfilPage() {
                       border: "none",
                       cursor: "pointer",
                       flexShrink: 0,
-                      backgroundColor: prefs[item.key] ? "#2D6A4F" : "#D1D5DB",
+                      backgroundColor: perfil[item.key] ? "#2D6A4F" : "#D1D5DB",
                       transition: "background-color 0.2s",
                     }}
                   >
@@ -84,7 +106,7 @@ export default function PerfilPage() {
                       style={{
                         position: "absolute",
                         top: "3px",
-                        left: prefs[item.key] ? "27px" : "3px",
+                        left: perfil[item.key] ? "27px" : "3px",
                         width: "18px",
                         height: "18px",
                         borderRadius: "9999px",
@@ -100,19 +122,17 @@ export default function PerfilPage() {
           </div>
 
           {/* Cuenta */}
-          <div className="bg-white rounded-xl2 shadow-card p-6">
+          <div className="bg-white rounded-[16px] shadow-[0_2px_12px_rgba(0,0,0,0.07)] p-6">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-4">🔐 Cuenta</p>
             <div className="divide-y divide-gray-100">
               {[
-                { icon:"🔒", label:"Cambiar contraseña" },
-                { icon:"🗑️", label:"Eliminar cuenta", danger:true },
+                { icon:"🔒", label:"Cambiar contraseña", danger:false },
+                { icon:"🗑️", label:"Eliminar cuenta",    danger:true  },
               ].map(item => (
                 <button key={item.label}
                   className={`w-full flex items-center justify-between py-4 hover:bg-gray-50 rounded-lg px-2 -mx-2 transition-colors ${item.danger ? "text-red" : "text-gray-700"}`}>
                   <div className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg ${item.danger ? "bg-red/10" : "bg-gray-100"}`}>
-                      {item.icon}
-                    </div>
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg ${item.danger ? "bg-red/10" : "bg-gray-100"}`}>{item.icon}</div>
                     <span className="text-sm font-medium">{item.label}</span>
                   </div>
                   <span className="text-gray-400">›</span>
@@ -122,13 +142,29 @@ export default function PerfilPage() {
           </div>
 
           {/* App info */}
-          <div className="bg-gradient-to-br from-green-dark to-green-mid rounded-xl2 p-5 flex items-center gap-4">
+          <div className="bg-gradient-to-br from-green-dark to-green-mid rounded-[16px] p-5 flex items-center gap-4">
             <span className="text-3xl">🌿</span>
             <div>
               <p className="text-white font-bold">Pan-Ext</p>
-              <p className="text-green-soft text-xs">Versión 1.0.0</p>
+              <p className="text-green-soft text-xs">Versión 1.0.0 · Firebase</p>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className="p-8">
+      <div className="h-8 bg-gray-200 rounded w-48 mb-2 animate-pulse" />
+      <div className="h-4 bg-gray-100 rounded w-32 mb-8 animate-pulse" />
+      <div className="grid grid-cols-3 gap-6">
+        <div className="bg-white rounded-[16px] h-64 animate-pulse" />
+        <div className="col-span-2 space-y-4">
+          <div className="bg-white rounded-[16px] h-48 animate-pulse" />
+          <div className="bg-white rounded-[16px] h-32 animate-pulse" />
         </div>
       </div>
     </div>
