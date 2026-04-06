@@ -87,8 +87,47 @@ interface ExpiraModalProps {
   onCancel: () => void;
 }
 
+function formatDateInput(raw: string, prev: string): string {
+  // Strip everything that isn't a digit
+  const digits = raw.replace(/\D/g, "").slice(0, 6); // ddmmyy → max 6 digits
+  // Insert slashes automatically
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0,2)}/${digits.slice(2)}`;
+  return `${digits.slice(0,2)}/${digits.slice(2,4)}/${digits.slice(4)}`;
+}
+
+function isValidDate(val: string): boolean {
+  // Expects dd/mm/yy or dd/mm/yyyy
+  const parts = val.split("/");
+  if (parts.length !== 3) return false;
+  const [d, m, yRaw] = parts.map(Number);
+  const y = yRaw < 100 ? 2000 + yRaw : yRaw;
+  if (isNaN(d) || isNaN(m) || isNaN(y)) return false;
+  if (m < 1 || m > 12 || d < 1) return false;
+  const date = new Date(y, m - 1, d);
+  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+}
+
 function ExpiraModal({ item, onConfirm, onCancel }: ExpiraModalProps) {
   const [expira, setExpira] = useState("");
+  const [error, setError]   = useState("");
+
+  const handleChange = (raw: string) => {
+    setExpira(prev => formatDateInput(raw, prev));
+    setError("");
+  };
+
+  const handleConfirm = () => {
+    if (expira && !isValidDate(expira)) {
+      setError("Fecha inválida. Usá el formato dd/mm/aa.");
+      return;
+    }
+    onConfirm(expira);
+  };
+
+  const complete = expira.replace(/\D/g, "").length === 6;
+  const valid    = complete && isValidDate(expira);
+
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
       onClick={onCancel}>
@@ -107,22 +146,38 @@ function ExpiraModal({ item, onConfirm, onCancel }: ExpiraModalProps) {
           <label className="text-xs text-gray-500 font-medium block mb-1">
             Fecha de expiración <span className="text-gray-300">(opcional)</span>
           </label>
-          <input
-            autoFocus
-            type="text"
-            value={expira}
-            onChange={e => setExpira(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter") onConfirm(expira); if (e.key === "Escape") onCancel(); }}
-            placeholder="dd/mm/aa"
-            className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-green-mid"
-          />
+          <div className="relative">
+            <input
+              autoFocus
+              type="text"
+              inputMode="numeric"
+              value={expira}
+              onChange={e => handleChange(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") handleConfirm(); if (e.key === "Escape") onCancel(); }}
+              placeholder="dd/mm/aa"
+              maxLength={8}
+              className={`w-full border rounded-xl px-4 py-2.5 text-sm focus:outline-none pr-8 transition-colors ${
+                error
+                  ? "border-red-400 focus:border-red-400"
+                  : valid
+                  ? "border-green-mid focus:border-green-mid"
+                  : "border-gray-200 focus:border-green-mid"
+              }`}
+            />
+            {complete && (
+              <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-sm ${valid ? "text-green-dark" : "text-red-400"}`}>
+                {valid ? "✓" : "✕"}
+              </span>
+            )}
+          </div>
+          {error && <p className="text-xs text-red-400 mt-1">{error}</p>}
         </div>
         <div className="flex gap-2">
           <button onClick={onCancel}
             className="flex-1 text-sm text-gray-500 py-2.5 hover:bg-gray-100 rounded-xl transition-colors">
             Cancelar
           </button>
-          <button onClick={() => onConfirm(expira)}
+          <button onClick={handleConfirm}
             className="flex-1 text-sm bg-green-dark text-white font-semibold py-2.5 rounded-xl hover:bg-green-mid transition-colors">
             Agregar al inventario
           </button>
