@@ -135,3 +135,19 @@ export const seedUserData = async (_uid: string) => {
   // compras y notificaciones limpios
   return Promise.resolve();
 };
+
+// ─── Storage ───────────────────────────────────────────────────────────────────
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { updateProfile } from "firebase/auth";
+import { storage, auth } from "./firebase";
+
+export const uploadFotoPerfil = async (uid: string, file: File): Promise<string> => {
+  const storageRef = ref(storage, `perfiles/${uid}/avatar`);
+  await uploadBytes(storageRef, file);
+  const url = await getDownloadURL(storageRef);
+  // Also update Firebase Auth profile photo
+  if (auth.currentUser) {
+    await updateProfile(auth.currentUser, { photoURL: url });
+  }
+  return url;
+};

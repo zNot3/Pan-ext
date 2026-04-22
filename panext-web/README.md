@@ -1,81 +1,77 @@
-# Pan-Ext Web — Next.js + Tailwind + Firebase
+# Pan-Ext Web — Next.js + Tailwind + Firebase + Gemini
 
 ---
 
-## Setup
+## Setup rápido
 
-### 1. Instalar dependencias
 ```bash
+# 1. Instalar dependencias
 npm install
-```
 
-### 2. Configurar Firebase
-Copiá el archivo de ejemplo y llenalo con tus credenciales:
-```bash
+# 2. Configurar variables de entorno
 cp .env.local.example .env.local
-```
+# Editá .env.local con tus credenciales
 
-Editá `.env.local` con los valores de tu proyecto Firebase:
-```
-NEXT_PUBLIC_FIREBASE_API_KEY=AIza...
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=pan-ext.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=pan-ext
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=pan-ext.firebasestorage.app
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=8...
-NEXT_PUBLIC_FIREBASE_APP_ID=1:...
-```
-
-### 3. Correr en desarrollo
-```bash
+# 3. Correr en desarrollo
 npm run dev
 ```
 
-Abrí http://localhost:3000 — te va a redirigir al login automáticamente.
+---
+
+## Variables de entorno requeridas
+
+### Firebase (console.firebase.google.com)
+```
+NEXT_PUBLIC_FIREBASE_API_KEY=
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+NEXT_PUBLIC_FIREBASE_APP_ID=
+```
+
+### Gemini AI (aistudio.google.com/app/apikey)
+```
+GEMINI_API_KEY=
+```
 
 ---
 
-## Estructura de Firestore
+## Servicios Firebase requeridos
+
+En la consola de Firebase activá:
+1. **Authentication** → Email/Password + Google
+2. **Firestore Database** → crear en modo test
+3. **Storage** → crear en modo test (para foto de perfil)
+
+Para Google Auth también tenés que agregar tu dominio en:
+Authentication → Settings → Authorized domains → agregar `localhost`
+
+---
+
+## Estructura de datos (Firestore)
 
 ```
 users/
-  {uid}/                        ← documento del usuario (perfil + preferencias)
-    inventario/
-      {itemId}/                 ← InventarioDoc
-    compras/
-      {itemId}/                 ← CompraDoc
-    notificaciones/
-      {itemId}/                 ← NotificacionDoc
+  {uid}/                    ← perfil + preferencias del usuario
+    inventario/{id}         ← productos con qty, expira, alert
+    compras/{id}            ← items de la lista de compras
+    notificaciones/{id}     ← generadas automáticamente desde inventario
 ```
-
----
-
-## Flujo de autenticación
-
-1. Usuario accede a cualquier ruta → `AuthGuard` detecta si hay sesión
-2. Sin sesión → redirige a `/login`
-3. Login exitoso → redirige a `/` (dashboard)
-4. Registro nuevo → crea perfil en Firestore + carga datos de ejemplo
-5. Logout → vuelve a `/login`
 
 ---
 
 ## Páginas
 
-| Página | Ruta | Backend |
-|--------|------|---------|
-| Login | `/login` | Firebase Auth |
-| Registro | `/registro` | Firebase Auth + Firestore |
-| Inicio | `/` | Firestore (inventario, compras, notifs) |
-| Compras | `/compras` | Firestore CRUD |
-| Recetas | `/recetas` | Datos estáticos (se migra en v2) |
-| Receta IA | `/recetas/ia` | Respuestas simuladas |
-| Inventario | `/inventario` | Firestore CRUD |
-| Notificaciones | `/notificaciones` | Firestore |
-| Perfil | `/perfil` | Firestore |
-
----
-
-## ⚠️ Importante
-
-- **Nunca** subas `.env.local` a un repositorio público
-- Las reglas de Firestore están en modo **test** — configurá las reglas de seguridad antes de ir a producción
+| Página | Ruta | Descripción |
+|--------|------|-------------|
+| Login | `/login` | Email/pass + Google |
+| Registro | `/registro` | Crea cuenta nueva |
+| Inicio | `/` | Dashboard con stats |
+| Compras | `/compras` | Lista interactiva → agrega al inventario al marcar |
+| Recetas | `/recetas` | Catálogo con filtros |
+| Detalle receta | `/recetas/[id]` | Ingredientes, pasos, macros |
+| Receta con IA | `/recetas/ia` | Chat con Gemini + contexto de inventario |
+| Inventario | `/inventario` | CRUD con edición inline de fechas |
+| Notificaciones | `/notificaciones` | Auto-generadas desde inventario |
+| Perfil | `/perfil` | Preferencias + foto de perfil |
