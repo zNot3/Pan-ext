@@ -6,22 +6,22 @@ import { getInventario, InventarioDoc } from "@/lib/firestore";
 interface Message { id: number; text: string; isUser: boolean; loading?: boolean; }
 
 const QUICK_IDEAS = [
-  { label:"Sorpréndeme",              text:"Sorpréndeme con una receta con lo que tengo" },
-  { label:"Desayuno saludable",       text:"Quiero un desayuno rápido y saludable" },
-  { label:"Usar antes de que expiren",text:"¿Qué puedo cocinar con los ingredientes que están por expirar?" },
-  { label:"Postre fácil",             text:"Quiero un postre fácil con ingredientes básicos" },
+  { label:"Sorpréndeme",               text:"Sorpréndeme con una receta usando lo que tengo en mi inventario" },
+  { label:"Desayuno saludable",        text:"Quiero un desayuno rápido y saludable con lo que tengo" },
+  { label:"Usar antes de que expiren", text:"¿Qué puedo cocinar con los ingredientes que están por expirar?" },
+  { label:"Postre fácil",              text:"Quiero un postre fácil con ingredientes básicos" },
 ];
 
 export default function RecetaIAPage() {
   const { user } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([
+  const [messages, setMessages]     = useState<Message[]>([
     { id: 0, text: "¡Hola! Soy tu asistente de cocina. Cuéntame qué ingredientes tenés o qué se te antoja y te creo una receta personalizada 🔍", isUser: false },
   ]);
   const [input, setInput]           = useState("");
   const [sending, setSending]       = useState(false);
   const [inventario, setInventario] = useState<InventarioDoc[]>([]);
   const [loadingInv, setLoadingInv] = useState(true);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef              = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -40,80 +40,57 @@ export default function RecetaIAPage() {
     if (!msg || sending) return;
     setInput("");
 
-    const userMsg: Message = { id: Date.now(), text: msg, isUser: true };
-    const loadingMsg: Message = { id: Date.now() + 1, text: "", isUser: false, loading: true };
+    const userMsg:    Message = { id: Date.now(),     text: msg, isUser: true  };
+    const loadingMsg: Message = { id: Date.now() + 1, text: "",  isUser: false, loading: true };
     setMessages(prev => [...prev, userMsg, loadingMsg]);
     setSending(true);
 
     try {
-      const systemPrompt = `Sos un asistente de cocina amigable y creativo para la app Pan-Ext, una app de gestión de despensa.
-Tu objetivo es ayudar a los usuarios a crear recetas personalizadas basadas en sus ingredientes disponibles.
+      const inventarioCtx = inventario.length > 0
+        ? `\nIngredientes en el inventario del usuario:\n${inventario.map(i => `- ${i.name} (cantidad: ${i.qty}, expira: ${i.expira})`).join("\n")}\n`
+        : "\nEl usuario no tiene ingredientes en su inventario aún.\n";
+
+      const systemPrompt = `Sos un asistente de cocina amigable y creativo para Pan-Ext, una app de gestión de despensa.
+Tu objetivo es ayudar a crear recetas personalizadas basadas en los ingredientes disponibles del usuario.
+${inventarioCtx}
 Reglas:
 - Respondé siempre en español
-- Sé conciso pero completo (máximo 200 palabras por respuesta)
-- Si el usuario pide una receta, incluí: nombre, tiempo estimado, ingredientes necesarios y pasos resumidos
-- Si faltan ingredientes del inventario, mencionalo brevemente
-- Sé entusiasta y motivador
-- No inventes ingredientes que no existen
-- Si el usuario saluda o hace preguntas generales, respondé naturalmente antes de ofrecer ayuda con recetas`;
+- Sé conciso pero completo (máximo 200 palabras)
+- Si pedís una receta, incluí: nombre, tiempo estimado, ingredientes y pasos resumidos
+- Si faltan ingredientes del inventario, mencionalo
+- Sé entusiasta y motivador`;
 
-      // Build visible conversation history
+      // Build conversation history (exclude loading messages)
       const historial = messages
-        .filter(m => !m.loading)
+        .filter(m => !m.loading && m.id !== 0) // skip intro message for brevity
+        .slice(-8) // last 8 messages max for context window
         .map(m => ({
-          role: m.isUser ? "user" as const : "assistant" as const,
+          role:    m.isUser ? "user" as const : "assistant" as const,
           content: m.text,
         }));
 
-      // Hidden first turn: send the full inventory silently so Gemini
-      // knows what's available before the user types anything.
-      // This is never shown in the UI.
-      const inventarioPrompt = inventario.length > 0
-        ? `[Contexto del sistema — no mencionar al usuario directamente]\nInventario actual del usuario:\n${inventario.map(i => `- ${i.name} (cantidad: ${i.qty}, expira: ${i.expira})`).join("\n")}\nUsá esta información para sugerir recetas con ingredientes disponibles.`
-        : "[Contexto del sistema] El usuario no tiene productos en su inventario todavía.";
-
-      const hiddenTurns = [
-        { role: "user"      as const, content: inventarioPrompt },
-        { role: "assistant" as const, content: "Entendido, ya tengo el inventario cargado. Estoy listo para ayudarte con recetas." },
-      ];
-
-      // Drop leading assistant message from visible history (the UI greeting)
-      const historialVisible = historial.filter((_, i) =>
-        !(i === 0 && historial[0]?.role === "assistant")
-      );
-
-      // Llama al route interno de Next.js — la API key de Gemini queda segura en el servidor
-      const response = await fetch("/api/chat", {
-        method: "POST",
+      const res = await fetch("/api/chat", {
+        method:  "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body:    JSON.stringify({
+          messages:     [...historial, { role: "user", content: msg }],
           systemPrompt,
-          messages: [
-            ...hiddenTurns,
-            ...historialVisible,
-            { role: "user" as const, content: msg },
-          ],
         }),
       });
 
-      const data = await response.json();
-      let reply: string;
-      if (response.ok) {
-        reply = data.reply ?? "Lo siento, no pude generar una respuesta. Intentá de nuevo.";
-      } else {
-        // Show the real error in dev so it's easy to diagnose
-        const detail = data.detail?.error?.message ?? data.error ?? `Error ${response.status}`;
-        reply = `Error de la IA: ${detail}`;
-        console.error("Gemini error:", data);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error ?? "Error desconocido");
       }
 
+      const reply = data.reply ?? "Lo siento, no pude generar una respuesta. Intentá de nuevo.";
+      setMessages(prev => prev.map(m => m.loading ? { ...m, text: reply, loading: false } : m));
+
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : "Error al conectar con la IA.";
       setMessages(prev => prev.map(m =>
-        m.loading ? { ...m, text: reply, loading: false } : m
-      ));
-    } catch (err) {
-      console.error("fetch /api/chat failed:", err);
-      setMessages(prev => prev.map(m =>
-        m.loading ? { ...m, text: "No se pudo conectar con el servidor. Verificá que la app esté corriendo correctamente.", loading: false } : m
+        m.loading ? { ...m, text: `⚠️ ${errMsg}`, loading: false } : m
       ));
     } finally {
       setSending(false);
@@ -186,23 +163,22 @@ Reglas:
 
         {/* Sidebar */}
         <div className="w-64 space-y-4 flex-shrink-0">
-          {/* Inventario disponible */}
+          {/* Inventario */}
           <div className="bg-white rounded-[16px] shadow-[0_2px_12px_rgba(0,0,0,0.07)] p-4">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">
-              🧺 Tu inventario
-            </p>
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">🧺 Tu inventario</p>
             {loadingInv ? (
               <div className="space-y-2">
                 {[...Array(3)].map((_, i) => <div key={i} className="h-6 bg-gray-100 rounded animate-pulse" />)}
               </div>
             ) : inventario.length === 0 ? (
-              <p className="text-xs text-gray-400">Tu inventario está vacío. Agrega productos primero.</p>
+              <p className="text-xs text-gray-400">Tu inventario está vacío. Agregá productos primero.</p>
             ) : (
               <div className="flex flex-wrap gap-1.5">
                 {inventario.map(item => (
                   <button key={item.id}
-                    onClick={() => sendMessage(`Tengo ${item.name} y quiero una receta`)}
-                    className="text-xs bg-gray-100 hover:bg-green-soft hover:text-green-dark text-gray-700 px-2.5 py-1 rounded-full transition-colors">
+                    onClick={() => sendMessage(`Tengo ${item.name}, ¿qué receta me recomendás?`)}
+                    disabled={sending}
+                    className="text-xs bg-gray-100 hover:bg-green-soft hover:text-green-dark text-gray-700 px-2.5 py-1 rounded-full transition-colors disabled:opacity-50">
                     {item.icon} {item.name}
                   </button>
                 ))}
@@ -212,9 +188,7 @@ Reglas:
 
           {/* Ideas rápidas */}
           <div className="bg-white rounded-[16px] shadow-[0_2px_12px_rgba(0,0,0,0.07)] p-4">
-            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">
-              💡 Ideas rápidas
-            </p>
+            <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-3">💡 Ideas rápidas</p>
             <div className="space-y-1.5">
               {QUICK_IDEAS.map(idea => (
                 <button key={idea.label}
@@ -225,6 +199,14 @@ Reglas:
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Tip */}
+          <div className="bg-purple-50 rounded-[16px] p-4">
+            <p className="text-xs text-purple-700 font-semibold mb-1">💡 Tip</p>
+            <p className="text-xs text-purple-600">
+              Tocá un ingrediente de tu inventario para pedirle ideas de recetas directamente.
+            </p>
           </div>
         </div>
       </div>

@@ -1,16 +1,33 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { getPerfil, updatePerfil, PerfilDoc } from "@/lib/firestore";
+import { getPerfil, updatePerfil, PerfilDoc, uploadFotoPerfil } from "@/lib/firestore";
 
 export default function PerfilPage() {
   const { user, logout } = useAuth();
   const [perfil, setPerfil]   = useState<PerfilDoc | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving]   = useState(false);
+  const [saving,       setSaving]       = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoURL,       setPhotoURL]       = useState<string | null>(null);
+
+  const handleFotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setUploadingPhoto(true);
+    try {
+      const url = await uploadFotoPerfil(user.uid, file);
+      setPhotoURL(url);
+    } catch {
+      // silently fail — photo just doesn't update
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
+    setPhotoURL(user.photoURL ?? null);
     getPerfil(user.uid).then(data => {
       setPerfil(data ?? {
         nombre: user.displayName ?? "Usuario",
@@ -55,8 +72,21 @@ export default function PerfilPage() {
         <div className="col-span-1">
           <div className="bg-white rounded-[16px] shadow-[0_2px_12px_rgba(0,0,0,0.07)] overflow-hidden">
             <div className="bg-gradient-to-br from-green-dark to-green-mid p-8 text-center">
-              <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center text-4xl mx-auto mb-3">
-                {perfil.nombre?.[0]?.toUpperCase() ?? "👤"}
+              <div className="relative w-20 h-20 mx-auto mb-3 group">
+                {photoURL ? (
+                  <img src={photoURL} alt="Avatar" className="w-20 h-20 rounded-full object-cover" />
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-white/20 flex items-center justify-center text-4xl">
+                    {perfil.nombre?.[0]?.toUpperCase() ?? "👤"}
+                  </div>
+                )}
+                <label className="absolute inset-0 rounded-full flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                  {uploadingPhoto
+                    ? <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    : <span className="text-white text-xs font-semibold">📷</span>
+                  }
+                  <input type="file" accept="image/*" className="hidden" onChange={handleFotoChange} />
+                </label>
               </div>
               <h2 className="font-display font-bold text-white text-xl">{perfil.nombre}</h2>
               <p className="text-green-soft text-sm mt-1">{perfil.email}</p>
