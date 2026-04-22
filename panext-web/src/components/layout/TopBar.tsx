@@ -1,7 +1,10 @@
 "use client";
 import Link from "next/link";
+import { useNotif } from "@/context/NotifContext";
 
 export default function TopBar() {
+  const { unreadCount, urgentCount } = useNotif();
+
   return (
     <header className="fixed top-0 left-56 right-0 h-14 bg-white/80 backdrop-blur border-b border-gray-200 flex items-center justify-between px-6 z-30">
       {/* Search */}
@@ -16,11 +19,19 @@ export default function TopBar() {
 
       {/* Right actions */}
       <div className="flex items-center gap-3">
-        <Link href="/notificaciones"
+        <Link
+          href="/notificaciones"
           className="relative p-2 rounded-xl hover:bg-gray-100 transition-colors text-lg"
-          title="Notificaciones">
+          title="Notificaciones"
+        >
           🔔
-          <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500" />
+          {unreadCount > 0 && (
+            <span className={`absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full text-white text-[10px] font-bold flex items-center justify-center px-1 ${
+              urgentCount > 0 ? "bg-red" : "bg-orange"
+            }`}>
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
         </Link>
         <Link href="/perfil" className="p-2 rounded-xl hover:bg-gray-100 transition-colors text-lg" title="Ajustes">
           ⚙️

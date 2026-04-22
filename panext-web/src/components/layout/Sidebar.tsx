@@ -10,16 +10,19 @@ const navItems = [
   { label:"Recetas",          href:"/recetas",         icon:"🍽️", section:"principal" },
   { label:"Inventario",       href:"/inventario",      icon:"📦", section:"principal" },
   { label:"Receta con IA",    href:"/recetas/ia",      icon:"✨", section:"herramientas" },
-  { label:"Notificaciones",   href:"/notificaciones",  icon:"🔔", section:"herramientas" },
+  { label:"Notificaciones",   href:"/notificaciones",  icon:"🔔", section:"herramientas", notifBadge:true },
 ];
 
 export default function Sidebar() {
-  const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const pathname             = usePathname();
+  const { user, logout }     = useAuth();
   const { unreadCount, urgentCount } = useNotif();
 
   const principal    = navItems.filter(i => i.section === "principal");
   const herramientas = navItems.filter(i => i.section === "herramientas");
+
+  const avatarChar = user?.displayName?.[0]?.toUpperCase();
+  const avatarPhoto = user?.photoURL;
 
   return (
     <aside className="fixed top-0 left-0 h-screen w-56 bg-white border-r border-gray-200 flex flex-col z-40 shadow-card">
@@ -38,18 +41,16 @@ export default function Sidebar() {
           {principal.map(item => (
             <NavLink key={item.href} item={item} active={
               item.href === "/" ? pathname === "/" : pathname.startsWith(item.href)
-            } />
+            } badge={0} />
           ))}
         </ul>
         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest px-2 mb-2">Herramientas</p>
         <ul className="space-y-0.5">
           {herramientas.map(item => (
-            <NavLink
-              key={item.href}
-              item={item}
+            <NavLink key={item.href} item={item}
               active={pathname.startsWith(item.href)}
-              badge={item.href === "/notificaciones" ? unreadCount : 0}
-              badgeUrgent={item.href === "/notificaciones" ? urgentCount > 0 : false}
+              badge={item.notifBadge ? unreadCount : 0}
+              urgent={item.notifBadge ? urgentCount > 0 : false}
             />
           ))}
         </ul>
@@ -58,8 +59,11 @@ export default function Sidebar() {
       {/* User + logout */}
       <div className="border-t border-gray-100">
         <Link href="/perfil" className="p-4 flex items-center gap-3 hover:bg-gray-100 transition-colors">
-          <div className="w-8 h-8 rounded-full bg-green-soft flex items-center justify-center text-sm flex-shrink-0">
-            {user?.displayName?.[0]?.toUpperCase() ?? "👤"}
+          <div className="w-8 h-8 rounded-full bg-green-soft flex items-center justify-center text-sm flex-shrink-0 overflow-hidden">
+            {avatarPhoto
+              ? <img src={avatarPhoto} alt="avatar" className="w-full h-full object-cover" />
+              : <span className="font-semibold text-green-dark">{avatarChar ?? "👤"}</span>
+            }
           </div>
           <div className="min-w-0">
             <p className="text-xs font-semibold text-gray-800 truncate">{user?.displayName ?? "Usuario"}</p>
@@ -75,13 +79,11 @@ export default function Sidebar() {
   );
 }
 
-function NavLink({
-  item, active, badge = 0, badgeUrgent = false
-}: {
+function NavLink({ item, active, badge, urgent }: {
   item: typeof navItems[0];
   active: boolean;
-  badge?: number;
-  badgeUrgent?: boolean;
+  badge: number;
+  urgent?: boolean;
 }) {
   return (
     <li>
@@ -92,10 +94,8 @@ function NavLink({
         <span className="text-base">{item.icon}</span>
         <span className="flex-1 truncate">{item.label}</span>
         {badge > 0 && (
-          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center leading-none ${
-            badgeUrgent ? "bg-red text-white animate-pulse" : "bg-orange text-white"
-          }`}>
-            {badge > 99 ? "99+" : badge}
+          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full text-white ${urgent ? "bg-red" : "bg-orange"}`}>
+            {badge > 9 ? "9+" : badge}
           </span>
         )}
       </Link>
